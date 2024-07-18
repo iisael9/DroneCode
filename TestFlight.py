@@ -1,6 +1,9 @@
 from pymavlink import mavutil
 import time
 
+ # Random change
+
+
 # Connect to the drone
 master = mavutil.mavlink_connection('/dev/ttyAMA0', baud=57600)
 
@@ -101,3 +104,5 @@ time.sleep(10)
 # Disarm the drone
 print("Disarming drone...")
 disarm()
+ 
+ # Random change
