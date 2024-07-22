@@ -134,7 +134,7 @@ def run(model: str, max_results: int, score_threshold: float,
         csv_file.close()
         detector.close()
         cv2.destroyAllWindows()
-
+####
 def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -153,7 +153,7 @@ def main():
         help='The score threshold of detection results.',
         required=False,
         type=float,
-        default=0.75)
+        default=0.25)
     parser.add_argument(
         '--cameraId', help='Id of camera.', required=False, type=int, default=0)
     parser.add_argument(
@@ -171,3 +171,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+##### Test coment
