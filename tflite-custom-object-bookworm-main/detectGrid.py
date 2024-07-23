@@ -24,14 +24,6 @@ picam2.preview_configuration.align()
 picam2.configure("preview")
 picam2.start()
 
-# Define the path where you want to save the CSV file
-csv_file_path = os.path.join(os.getcwd(), 'detection_data.csv')
-
-# Open the CSV file and write the header
-csv_file = open(csv_file_path, mode='a', newline='')
-csv_writer = csv.writer(csv_file)
-csv_writer.writerow(['Date', 'Time', 'Width', 'Height', 'Confidence', 'Center_X', 'Center_Y'])
-
 def run(model: str, max_results: int, score_threshold: float, 
         camera_id: int, width: int, height: int) -> None:
     """Continuously run inference on images acquired from the camera.
@@ -73,21 +65,16 @@ def run(model: str, max_results: int, score_threshold: float,
             width = bbox.width
             height = bbox.height
             score = detection.categories[0].score  
-            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
 
             # Calculate the center of the bounding box
             center_x = bbox.origin_x + width / 2
             center_y = bbox.origin_y + height / 2
 
             # Convert to center-origin coordinates
-            center_x = center_x - width / 2
-            center_y = center_y - height / 2
+            center_x_centered = center_x - (width / 2)
+            center_y_centered = center_y - (height / 2)
 
-            print(f"[{current_time}] Detected object bounding box - Width: {width} pixels, Height: {height} pixels, Confidence: {score:.2f}, Center: ({center_x}, {center_y})")
-            
-            # Write the data to the CSV file
-            date, time_with_ms = current_time.split(' ')
-            csv_writer.writerow([date, time_with_ms, width, height, score, center_x, center_y])
+            print(f"Detected object bounding box - Width: {width} pixels, Height: {height} pixels, Confidence: {score:.2f}, Center: ({center_x_centered}, {center_y_centered})")
 
     # Initialize the object detection model
     base_options = python.BaseOptions(model_asset_path=model)
@@ -111,7 +98,15 @@ def run(model: str, max_results: int, score_threshold: float,
             # Run object detection using the model.
             detector.detect_async(mp_image, time.time_ns() // 1_000_000)
 
-            # Show the FPS
+            # Draw the grid
+            height, width, _ = image.shape
+            center_x, center_y = width // 2, height // 2
+
+            # Draw vertical and horizontal lines
+            cv2.line(image, (center_x, 0), (center_x, height), (255, 0, 0), 1)
+            cv2.line(image, (0, center_y), (width, center_y), (255, 0, 0), 1)
+
+            # Draw the FPS
             fps_text = 'FPS = {:.1f}'.format(FPS)
             text_location = (left_margin, row_size)
             current_frame = image
@@ -119,7 +114,29 @@ def run(model: str, max_results: int, score_threshold: float,
                         font_size, text_color, font_thickness, cv2.LINE_AA)
 
             if detection_result_list:
-                current_frame = visualize(current_frame, detection_result_list[0])
+                for result in detection_result_list:
+                    for detection in result.detections:
+                        bbox = detection.bounding_box
+                        width = bbox.width
+                        height = bbox.height
+                        score = detection.categories[0].score  
+
+                        # Calculate the center of the bounding box
+                        bbox_center_x = bbox.origin_x + width / 2
+                        bbox_center_y = bbox.origin_y + height / 2
+
+                        # Convert to center-origin coordinates
+                        center_x_centered = bbox_center_x - center_x
+                        center_y_centered = bbox_center_y - center_y
+
+                        # Draw the bounding box and center point
+                        cv2.rectangle(current_frame, (bbox.origin_x, bbox.origin_y),
+                                      (bbox.origin_x + width, bbox.origin_y + height), (0, 255, 0), 2)
+                        cv2.circle(current_frame, (bbox_center_x, bbox_center_y), 5, (0, 0, 255), -1)
+                        cv2.putText(current_frame, f'({center_x_centered}, {center_y_centered})',
+                                    (bbox_center_x, bbox_center_y), cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.5, (255, 255, 255), 1, cv2.LINE_AA)
+
                 detection_frame = current_frame
                 detection_result_list.clear()
 
@@ -130,8 +147,6 @@ def run(model: str, max_results: int, score_threshold: float,
             if cv2.waitKey(1) == 27:
                 break
     finally:
-        # Ensure the CSV file is closed properly
-        csv_file.close()
         detector.close()
         cv2.destroyAllWindows()
 
