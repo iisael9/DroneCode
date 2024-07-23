@@ -63,7 +63,7 @@ def run(model: str, max_results: int, score_threshold: float,
 
         detection_result_list.append(result)
         COUNTER += 1
-#####################################################
+
         # Get the center of the video frame
         video_center_x = 4608 / 2
         video_center_y = 2592 / 2
