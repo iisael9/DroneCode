@@ -144,7 +144,7 @@ def main():
         help='The score threshold of detection results.',
         required=False,
         type=float,
-        default=0.75)
+        default=0.25)
     parser.add_argument(
         '--cameraId', help='Id of camera.', required=False, type=int, default=0)
     parser.add_argument(
