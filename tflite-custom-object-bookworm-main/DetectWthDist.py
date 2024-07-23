@@ -12,12 +12,16 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-from utils import visualize  # Assuming this function draws bounding boxes and labels
+# from utils import visualize  # Assuming this function draws bounding boxes and labels
 from picamera2 import Picamera2
 
 # Global variables to calculate FPS
 COUNTER, FPS = 0, 0
 START_TIME = time.time()
+fps_avg_frame_count = 10
+detection_result_list = []
+horizontal_fov_degrees = 66  # Field of view in degrees
+
 picam2 = Picamera2()
 picam2.preview_configuration.main.size = (640, 480)
 picam2.preview_configuration.main.format = "RGB888"
@@ -31,7 +35,61 @@ csv_file_path = os.path.join(os.getcwd(), 'detection_data.csv')
 # Open the CSV file and write the header
 csv_file = open(csv_file_path, mode='a', newline='')
 csv_writer = csv.writer(csv_file)
-csv_writer.writerow(['Date', 'Time', 'Width', 'Height', 'Confidence', 'Horizontal Distance', 'Vertical Distance'])
+csv_writer.writerow(['Date', 'Time', 'Width', 'Height', 'Confidence', 'Horizontal Distance', 'Vertical Distance', 'Distance'])
+
+def estimate_distance_to_object(bbox_width_pixels):
+    # Known real-world width of the drone (in meters)
+    KNOWN_WIDTH = 0.4  # 40 cm
+
+    # Focal length of the camera (in pixels)
+    # This can be obtained through camera calibration. Here, it's an example value.
+    FOCAL_LENGTH = 800  # Adjust this value according to your camera
+
+    # Calculate the distance from the camera to the object
+    distance = (KNOWN_WIDTH * FOCAL_LENGTH) / bbox_width_pixels
+    return distance
+
+def save_result(result: vision.ObjectDetectorResult, unused_output_image: mp.Image, timestamp_ms: int):
+    global FPS, COUNTER, START_TIME, detection_result_list, horizontal_fov_degrees
+
+    # Calculate the FPS
+    if COUNTER % fps_avg_frame_count == 0:
+        FPS = fps_avg_frame_count / (time.time() - START_TIME)
+        START_TIME = time.time()
+
+    detection_result_list.append(result)
+    COUNTER += 1
+
+    # Center of the camera screen
+    screen_center_x, screen_center_y = 320, 240  # Assuming the center of the resized frame (640, 480)
+
+    # Print out the rectangle size and confidence score for each detected object with timestamp
+    for detection in result.detections:
+        bbox = detection.bounding_box
+        width = bbox.width
+        height = bbox.height
+        score = detection.categories[0].score
+
+        # Calculate the center of the bounding box
+        bbox_center_x = bbox.origin_x + width / 2
+        bbox_center_y = bbox.origin_y + height / 2
+
+        # Calculate the distance from the center of the screen to the center of the bounding box
+        horizontal_distance = bbox_center_x - screen_center_x 
+        vertical_distance = screen_center_y - bbox_center_y  # Invert the y-coordinate
+
+        # Calculate theta relative to the camera's FOV
+        theta = (horizontal_distance / screen_center_x) * (horizontal_fov_degrees / 2)
+
+        # Estimate the distance to the object
+        distance_to_object = estimate_distance_to_object(width)
+
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        print(f"[{current_time}] Detected object bounding box - Width: {width} pixels, Height: {height} pixels, Confidence: {score:.2f}, Center: ({bbox_center_x}, {bbox_center_y}), Horizontal Distance: {horizontal_distance} pixels, Vertical Distance: {vertical_distance} pixels, Theta: {theta:.2f} degrees, Distance: {distance_to_object:.2f} meters")
+
+        # Write the data to the CSV file
+        date, time_with_ms = current_time.split(' ')
+        csv_writer.writerow([date, time_with_ms, width, height, score, horizontal_distance, vertical_distance, distance_to_object])
 
 def run(model: str, max_results: int, score_threshold: float, 
         camera_id: int, width: int, height: int) -> None:
@@ -52,53 +110,12 @@ def run(model: str, max_results: int, score_threshold: float,
     text_color = (0, 0, 0)  # black
     font_size = 1
     font_thickness = 1
-    fps_avg_frame_count = 10
 
     detection_frame = None
-    detection_result_list = []
 
     # Camera FOV parameters
-    horizontal_fov_degrees = 66  # Field of view in degrees
+    global horizontal_fov_degrees
     horizontal_fov_radians = math.radians(horizontal_fov_degrees)
-
-    def save_result(result: vision.ObjectDetectorResult, unused_output_image: mp.Image, timestamp_ms: int):
-        global FPS, COUNTER, START_TIME
-
-        # Calculate the FPS
-        if COUNTER % fps_avg_frame_count == 0:
-            FPS = fps_avg_frame_count / (time.time() - START_TIME)
-            START_TIME = time.time()
-
-        detection_result_list.append(result)
-        COUNTER += 1
-
-        # Center of the camera screen
-        screen_center_x, screen_center_y = 320, 240  # Assuming the center of the resized frame (640, 480)
-
-        # Print out the rectangle size and confidence score for each detected object with timestamp
-        for detection in result.detections:
-            bbox = detection.bounding_box
-            width = bbox.width
-            height = bbox.height
-            score = detection.categories[0].score
-
-            # Calculate the center of the bounding box
-            bbox_center_x = bbox.origin_x + width / 2
-            bbox_center_y = bbox.origin_y + height / 2
-
-            # Calculate the distance from the center of the screen to the center of the bounding box
-            horizontal_distance = bbox_center_x - screen_center_x 
-            vertical_distance = screen_center_y - bbox_center_y  # Invert the y-coordinate
-
-            # Calculate theta relative to the camera's FOV
-            theta = (horizontal_distance / screen_center_x) * (horizontal_fov_degrees / 2)
-
-            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
-            print(f"[{current_time}] Detected object bounding box - Width: {width} pixels, Height: {height} pixels, Confidence: {score:.2f}, Center: ({bbox_center_x}, {bbox_center_y}), Horizontal Distance: {horizontal_distance} pixels, Vertical Distance: {vertical_distance} pixels, Theta: {theta:.2f} degrees")
-            
-            # Write the data to the CSV file
-            date, time_with_ms = current_time.split(' ')
-            csv_writer.writerow([date, time_with_ms, width, height, score, horizontal_distance, vertical_distance])
 
     # Initialize the object detection model
     base_options = python.BaseOptions(model_asset_path=model)
@@ -159,7 +176,8 @@ def run(model: str, max_results: int, score_threshold: float,
                     cv2.putText(current_frame, f'Theta: {theta:.2f}', (center_x + 5, center_y + 15), cv2.FONT_HERSHEY_SIMPLEX, 
                                 0.5, (255, 255, 255), 1, cv2.LINE_AA)
 
-                current_frame = visualize(current_frame, detection_result)
+                # Commenting out the visualize call
+                # current_frame = visualize(current_frame, detection_result)
                 detection_frame = current_frame
                 detection_result_list.clear()
 
