@@ -1,5 +1,4 @@
 import argparse
-import sys
 import time
 import datetime
 import csv
@@ -11,7 +10,6 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-from utils import visualize  # Assuming this function draws bounding boxes and labels
 from picamera2 import Picamera2
 
 # Global variables to calculate FPS
@@ -45,7 +43,6 @@ def run(model: str, max_results: int, score_threshold: float,
     font_thickness = 1
     fps_avg_frame_count = 10
 
-    detection_frame = None
     detection_result_list = []
 
     def save_result(result: vision.ObjectDetectorResult, unused_output_image: mp.Image, timestamp_ms: int):
@@ -59,22 +56,20 @@ def run(model: str, max_results: int, score_threshold: float,
         detection_result_list.append(result)
         COUNTER += 1
 
-        # Print out the rectangle size and confidence score for each detected object with timestamp
+        # Get the center of the video frame
+        video_center_x = 4608 / 2
+        video_center_y = 2592 / 2
+
+        # Print out the distance from the center of the video frame for each detected object
         for detection in result.detections:
             bbox = detection.bounding_box
             width = bbox.width
             height = bbox.height
-            score = detection.categories[0].score  
-
-            # Calculate the center of the bounding box
             center_x = bbox.origin_x + width / 2
             center_y = bbox.origin_y + height / 2
-
-            # Convert to center-origin coordinates
-            center_x_centered = center_x - (width / 2)
-            center_y_centered = center_y - (height / 2)
-
-            print(f"Detected object bounding box - Width: {width} pixels, Height: {height} pixels, Confidence: {score:.2f}, Center: ({center_x_centered}, {center_y_centered})")
+            x_distance = center_x - video_center_x
+            y_distance = center_y - video_center_y
+            print(f"X Distance from Center: {x_distance:.2f} pixels, Y Distance from Center: {y_distance:.2f} pixels")
 
     # Initialize the object detection model
     base_options = python.BaseOptions(model_asset_path=model)
@@ -98,50 +93,16 @@ def run(model: str, max_results: int, score_threshold: float,
             # Run object detection using the model.
             detector.detect_async(mp_image, time.time_ns() // 1_000_000)
 
-            # Draw the grid
-            height, width, _ = image.shape
-            center_x, center_y = width // 2, height // 2
-
-            # Draw vertical and horizontal lines
-            cv2.line(image, (center_x, 0), (center_x, height), (255, 0, 0), 1)
-            cv2.line(image, (0, center_y), (width, center_y), (255, 0, 0), 1)
-
-            # Draw the FPS
+            # Show the FPS
             fps_text = 'FPS = {:.1f}'.format(FPS)
             text_location = (left_margin, row_size)
             current_frame = image
             cv2.putText(current_frame, fps_text, text_location, cv2.FONT_HERSHEY_DUPLEX,
                         font_size, text_color, font_thickness, cv2.LINE_AA)
 
-            if detection_result_list:
-                for result in detection_result_list:
-                    for detection in result.detections:
-                        bbox = detection.bounding_box
-                        width = bbox.width
-                        height = bbox.height
-                        score = detection.categories[0].score  
+            detection_result_list.clear()
 
-                        # Calculate the center of the bounding box
-                        bbox_center_x = bbox.origin_x + width / 2
-                        bbox_center_y = bbox.origin_y + height / 2
-
-                        # Convert to center-origin coordinates
-                        center_x_centered = bbox_center_x - center_x
-                        center_y_centered = bbox_center_y - center_y
-
-                        # Draw the bounding box and center point
-                        cv2.rectangle(current_frame, (bbox.origin_x, bbox.origin_y),
-                                      (bbox.origin_x + width, bbox.origin_y + height), (0, 255, 0), 2)
-                        cv2.circle(current_frame, (bbox_center_x, bbox_center_y), 5, (0, 0, 255), -1)
-                        cv2.putText(current_frame, f'({center_x_centered}, {center_y_centered})',
-                                    (bbox_center_x, bbox_center_y), cv2.FONT_HERSHEY_SIMPLEX,
-                                    0.5, (255, 255, 255), 1, cv2.LINE_AA)
-
-                detection_frame = current_frame
-                detection_result_list.clear()
-
-            if detection_frame is not None:
-                cv2.imshow('object_detection', detection_frame)
+            cv2.imshow('object_detection', current_frame)
 
             # Stop the program if the ESC key is pressed.
             if cv2.waitKey(1) == 27:
@@ -166,11 +127,9 @@ def main():
     parser.add_argument(
         '--scoreThreshold',
         help='The score threshold of detection results.',
-        required=False,
-        type=float,
-        default=0.25)
+        required=False, type=float, default=0.25)
     parser.add_argument(
-        '--cameraId', help='Id of camera.', required=False, type=int, default=0)
+        '--cameraId', help='Id of camera.', required=False, type=int, default 0)
     parser.add_argument(
         '--frameWidth',
         help='Width of frame to capture from camera.',
