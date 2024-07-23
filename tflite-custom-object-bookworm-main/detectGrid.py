@@ -30,7 +30,7 @@ csv_file_path = os.path.join(os.getcwd(), 'detection_data.csv')
 # Open the CSV file and write the header
 csv_file = open(csv_file_path, mode='a', newline='')
 csv_writer = csv.writer(csv_file)
-csv_writer.writerow(['Date', 'Time', 'Width', 'Height', 'Confidence', 'Center X', 'Center Y'])
+csv_writer.writerow(['Date', 'Time', 'Width', 'Height', 'Confidence', 'Center_X', 'Center_Y'])
 
 def run(model: str, max_results: int, score_threshold: float, 
         camera_id: int, width: int, height: int) -> None:
@@ -67,16 +67,23 @@ def run(model: str, max_results: int, score_threshold: float,
         detection_result_list.append(result)
         COUNTER += 1
 
-        # Print out the rectangle size, confidence score, and center coordinates for each detected object with timestamp
+        # Print out the rectangle size and confidence score for each detected object with timestamp
         for detection in result.detections:
             bbox = detection.bounding_box
             width = bbox.width
             height = bbox.height
             score = detection.categories[0].score  
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+
+            # Calculate the center of the bounding box
             center_x = bbox.origin_x + width / 2
             center_y = bbox.origin_y + height / 2
-            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
-            print(f"[{current_time}] Detected object bounding box - Width: {width} pixels, Height: {height} pixels, Confidence: {score:.2f}, Center X: {center_x}, Center Y: {center_y}")
+
+            # Convert to center-origin coordinates
+            center_x = center_x - width / 2
+            center_y = center_y - height / 2
+
+            print(f"[{current_time}] Detected object bounding box - Width: {width} pixels, Height: {height} pixels, Confidence: {score:.2f}, Center: ({center_x}, {center_y})")
             
             # Write the data to the CSV file
             date, time_with_ms = current_time.split(' ')
@@ -110,13 +117,6 @@ def run(model: str, max_results: int, score_threshold: float,
             current_frame = image
             cv2.putText(current_frame, fps_text, text_location, cv2.FONT_HERSHEY_DUPLEX,
                         font_size, text_color, font_thickness, cv2.LINE_AA)
-
-            # Draw the grid
-            grid_color = (0, 255, 0)  # Green
-            grid_thickness = 1
-            for i in range(1, 3):
-                cv2.line(current_frame, (int(width * i / 3), 0), (int(width * i / 3), height), grid_color, grid_thickness)
-                cv2.line(current_frame, (0, int(height * i / 3)), (width, int(height * i / 3)), grid_color, grid_thickness)
 
             if detection_result_list:
                 current_frame = visualize(current_frame, detection_result_list[0])
