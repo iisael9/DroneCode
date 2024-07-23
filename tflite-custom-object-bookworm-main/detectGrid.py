@@ -1,15 +1,9 @@
 import argparse
 import time
-import datetime
-import csv
-import os
-
 import cv2
 import mediapipe as mp
-
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-
 from picamera2 import Picamera2
 
 # Global variables to calculate FPS
@@ -129,7 +123,7 @@ def main():
         help='The score threshold of detection results.',
         required=False, type=float, default=0.25)
     parser.add_argument(
-        '--cameraId', help='Id of camera.', required=False, type=int, default 0)
+        '--cameraId', help='Id of camera.', required=False, type=int, default=0)
     parser.add_argument(
         '--frameWidth',
         help='Width of frame to capture from camera.',
