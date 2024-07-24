@@ -234,25 +234,17 @@ def run(model: str, max_results: int, score_threshold: float, camera_id: int, wi
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Run live object detection with distance calculation")
-    parser.add_argument(
-        '--model', help='Path to the object detection model.', required=True)
-    parser.add_argument(
-        '--maxResults', help='Maximum number of detection results', default=3, type=int)
-    parser.add_argument(
-        '--scoreThreshold', help='Detection score threshold', default=0.5, type=float)
-    parser.add_argument(
-        '--cameraId', help='ID of the camera to use', default=0, type=int)
-    parser.add_argument(
-        '--width', help='Width of the frames to process', default=1920, type=int)
-    parser.add_argument(
-        '--height', help='Height of the frames to process', default=1080, type=int)
+    parser = argparse.ArgumentParser(description="Run live object detection with distance calculation")
+    parser.add_argument('--model', help='Path to the object detection model.', required=True)
+    parser.add_argument('--maxResults', help='Maximum number of detection results', default=3, type=int)
+    parser.add_argument('--scoreThreshold', help='Detection score threshold', default=0.5, type=float)
+    parser.add_argument('--cameraId', help='ID of the camera to use', default=0, type=int)
+    parser.add_argument('--width', help='Width of the frames to process', default=1920, type=int)
+    parser.add_argument('--height', help='Height of the frames to process', default=1080, type=int)
     args = parser.parse_args()
 
-    run(args.model, args.maxResults, args.scoreThreshold,
-        args.cameraId, args.width, args.height)
-
+    run(args.model, args.maxResults, args.scoreThreshold, args.cameraId, args.width, args.height)
 
 if __name__ == '__main__':
     main()
+
