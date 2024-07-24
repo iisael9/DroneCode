@@ -14,6 +14,9 @@ __Commander
 
 __Detection(%, L, W, D, X, Y)    (X,Y) Centtroid 
     need to get information of where it is positioned on the screen
+
+    get distance from center with an angle?
+    Center of bounding box X Y cordinates? instead?
     
 
 
