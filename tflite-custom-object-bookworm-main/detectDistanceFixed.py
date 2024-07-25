@@ -261,7 +261,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Run live object detection with distance calculation")
     parser.add_argument('--model', help='Path to the TFLite object detection model',
-                        default=os.path.join(os.getcwd(), 'your_model_name.tflite'))
+                        default=os.path.join(os.getcwd(), 'notBest.tflite'))
     parser.add_argument(
         '--maxResults', help='Maximum number of detection results', default=3, type=int)
     parser.add_argument(
