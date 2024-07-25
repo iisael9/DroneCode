@@ -265,7 +265,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--maxResults', help='Maximum number of detection results', default=3, type=int)
     parser.add_argument(
-        '--scoreThreshold', help='Detection score threshold', default=0.5, type=float)
+        '--scoreThreshold', help='Detection score threshold', default=0.2, type=float)
     parser.add_argument(
         '--cameraId', help='ID of the camera to use', default=0, type=int)
     parser.add_argument(
