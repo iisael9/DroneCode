@@ -260,6 +260,8 @@ def run(model: str, max_results: int, score_threshold: float, camera_id: int, wi
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Run live object detection with distance calculation")
+    parser.add_argument('--model', help='Path to the TFLite object detection model',
+                        default=os.path.join(os.getcwd(), 'your_model_name.tflite'))
     parser.add_argument(
         '--maxResults', help='Maximum number of detection results', default=3, type=int)
     parser.add_argument(
@@ -272,6 +274,5 @@ if __name__ == '__main__':
         '--height', help='Height of the frames to process', default=1080, type=int)
     args = parser.parse_args()
 
-    model_path = os.path.join(os.getcwd(), 'model.tflite')
-    run(model_path, args.maxResults, args.scoreThreshold,
+    run(args.model, args.maxResults, args.scoreThreshold,
         args.cameraId, args.width, args.height)
