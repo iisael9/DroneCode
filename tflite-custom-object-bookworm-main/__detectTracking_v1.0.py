@@ -1,6 +1,5 @@
-# Import necessary libraries
+from pymavlink import mavutil
 import argparse
-import sys
 import time
 import datetime
 import csv
@@ -9,13 +8,12 @@ import math
 import numpy as np
 import cv2
 import mediapipe as mp
-from sklearn.linear_model import LinearRegression
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-from pymavlink import mavutil
 from picamera2 import Picamera2
+from sklearn.linear_model import LinearRegression
 
-# Global variables to calculate FPS
+# Global variables
 COUNTER, FPS = 0, 0
 START_TIME = time.time()
 fps_avg_frame_count = 10
@@ -23,7 +21,6 @@ detection_result_list = []
 horizontal_fov_degrees = 66  # Field of view in degrees
 vertical_fov_degrees = 49  # Assuming a vertical field of view
 
-# Initialize camera
 picam2 = Picamera2()
 picam2.preview_configuration.main.size = (1920, 1080)  # Set to 1920x1080
 picam2.preview_configuration.main.format = "RGB888"
@@ -66,6 +63,53 @@ def fit_trendline():
 
 def calculate_distance(area, slope, intercept):
     return slope * area + intercept
+
+def get_battery_level(master):
+    battery_msg = master.recv_match(type='SYS_STATUS', blocking=True)
+    if battery_msg:
+        return battery_msg.battery_remaining
+    return None
+
+def return_to_launch(master):
+    master.mav.command_long_send(
+        master.target_system,
+        master.target_component,
+        mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH,
+        0,
+        0, 0, 0, 0, 0, 0, 0)
+
+def control_drone(horizontal_theta, vertical_theta, master, threshold=1.0):
+    if abs(horizontal_theta) > threshold:
+        if horizontal_theta > 0:
+            master.mav.command_long_send(
+                master.target_system,
+                master.target_component,
+                mavutil.mavlink.MAV_CMD_CONDITION_YAW,
+                0,
+                abs(horizontal_theta), 1, 1, 0, 0, 0, 0)
+        elif horizontal_theta < 0:
+            master.mav.command_long_send(
+                master.target_system,
+                master.target_component,
+                mavutil.mavlink.MAV_CMD_CONDITION_YAW,
+                0,
+                abs(horizontal_theta), -1, 1, 0, 0, 0, 0)
+
+    if abs(vertical_theta) > threshold:
+        if vertical_theta > 0:
+            master.mav.command_long_send(
+                master.target_system,
+                master.target_component,
+                mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED,
+                0,
+                1, abs(vertical_theta), 0, 0, 0, 0, 0)
+        elif vertical_theta < 0:
+            master.mav.command_long_send(
+                master.target_system,
+                master.target_component,
+                mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED,
+                0,
+                1, -abs(vertical_theta), 0, 0, 0, 0, 0)
 
 def save_result(result: vision.ObjectDetectorResult, unused_output_image: mp.Image, timestamp_ms: int):
     global FPS, COUNTER, START_TIME, detection_result_list, horizontal_fov_degrees, vertical_fov_degrees, areas, distances
@@ -125,63 +169,6 @@ def save_result(result: vision.ObjectDetectorResult, unused_output_image: mp.Ima
         # Return the bounding box, distance, and angles for displaying on the screen
         return bbox, distance_to_object, horizontal_theta, vertical_theta
 
-# Function to control the drone
-def control_drone(horizontal_theta, vertical_theta):
-    # Create the connection
-    master = mavutil.mavlink_connection("/dev/ttyAMA0", baud=57600)
-    # Wait a heartbeat before sending commands
-    master.wait_heartbeat()
-    print("Heartbeat!")
-
-    # Arm the drone
-    master.mav.command_long_send(
-        master.target_system,
-        master.target_component,
-        mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
-        0,
-        1, 1, 0, 0, 0, 0, 0)
-
-    # wait until arming confirmed
-    print("Waiting for the vehicle to arm")
-    master.motors_armed_wait()
-    print('Armed!')
-
-    # Adjust yaw based on horizontal_theta
-    if horizontal_theta > 0:
-        # Rotate right
-        master.mav.command_long_send(
-            master.target_system,
-            master.target_component,
-            mavutil.mavlink.MAV_CMD_CONDITION_YAW,
-            0,
-            abs(horizontal_theta), 1, 1, 0, 0, 0, 0)
-    elif horizontal_theta < 0:
-        # Rotate left
-        master.mav.command_long_send(
-            master.target_system,
-            master.target_component,
-            mavutil.mavlink.MAV_CMD_CONDITION_YAW,
-            0,
-            abs(horizontal_theta), -1, 1, 0, 0, 0, 0)
-
-    # Adjust pitch based on vertical_theta
-    if vertical_theta > 0:
-        # Tilt up
-        master.mav.command_long_send(
-            master.target_system,
-            master.target_component,
-            mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED,
-            0,
-            1, abs(vertical_theta), 0, 0, 0, 0, 0)
-    elif vertical_theta < 0:
-        # Tilt down
-        master.mav.command_long_send(
-            master.target_system,
-            master.target_component,
-            mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED,
-            0,
-            1, -abs(vertical_theta), 0, 0, 0, 0, 0)
-
 def run(model: str, max_results: int, score_threshold: float, 
         camera_id: int, width: int, height: int) -> None:
     """Continuously run inference on images acquired from the camera.
@@ -213,52 +200,73 @@ def run(model: str, max_results: int, score_threshold: float,
     base_options = python.BaseOptions(model_asset_path=model)
     options = vision.ObjectDetectorOptions(base_options=base_options,
                                            running_mode=vision.RunningMode.LIVE_STREAM,
-                                           max_results=max_results,
-                                           score_threshold=score_threshold,
+                                           max_results=max_results, score_threshold=score_threshold,
                                            result_callback=save_result)
     detector = vision.ObjectDetector.create_from_options(options)
 
+    # Create the connection to the drone
+    master = mavutil.mavlink_connection("/dev/ttyAMA0", baud=57600)
+    master.wait_heartbeat()
+    print("Heartbeat!")
+
+    master.mav.command_long_send(
+        master.target_system,
+        master.target_component,
+        mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+        0,
+        1, 1, 0, 0, 0, 0, 0)
+    master.motors_armed_wait()
+    print('Armed!')
+
     while True:
-        # Get image from Picamera2
-        image = picam2.capture_array()
-        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_image)
+        # Capture frame from the camera
+        rgb_image = picam2.capture_array()
+        if rgb_image is None:
+            print("Error: No image captured.")
+            continue
 
-        # Send image to the object detector
-        detector.detect_async(mp_image, time.time())
+        # Perform object detection
+        detection_result = detector.detect(rgb_image)
+        detection_result_list.append(detection_result)
 
-        # Draw the bounding box and angles on the image
-        for detection in detection_result_list[-1].detections:
+        # Check battery level
+        battery_level = get_battery_level(master)
+        if battery_level is not None:
+            print(f"Battery level: {battery_level}%")
+            if battery_level < 50:
+                print("Battery below 50%, returning to launch")
+                return_to_launch(master)
+                break
+
+        for detection in detection_result.detections:
             bbox, distance_to_object, horizontal_theta, vertical_theta = save_result(detection, rgb_image, time.time())
             if bbox:
                 top_left = (int(bbox.origin_x), int(bbox.origin_y))
                 bottom_right = (int(bbox.origin_x + bbox.width), int(bbox.origin_y + bbox.height))
-                cv2.rectangle(image, top_left, bottom_right, (0, 255, 0), 2)
+                cv2.rectangle(rgb_image, top_left, bottom_right, (0, 255, 0), 2)
                 label = f"{distance_to_object:.2f} m, θh: {horizontal_theta:.2f}, θv: {vertical_theta:.2f}"
-                cv2.putText(image, label, (bbox.origin_x, bbox.origin_y - 10), cv2.FONT_HERSHEY_SIMPLEX, font_size, text_color, font_thickness)
+                cv2.putText(rgb_image, label, (bbox.origin_x, bbox.origin_y - 10), cv2.FONT_HERSHEY_SIMPLEX, font_size, text_color, font_thickness)
 
                 # Control the drone based on the detected angles
-                control_drone(horizontal_theta, vertical_theta)
+                control_drone(horizontal_theta, vertical_theta, master, threshold=1.0)
 
-        # Display the frame
-        cv2.imshow('Drone Detection', image)
-
-        if cv2.waitKey(1) & 0xFF == 27:  # Press 'ESC' to quit
+        # Display frame
+        if detection_frame is None:
+            detection_frame = np.zeros((height, width, 3), dtype=np.uint8)
+        cv2.imshow("Object Detection", rgb_image)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-    cv2.destroyAllWindows()
     picam2.stop()
     if log_data:
         csv_file.close()
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--model', help='Path to the object detection model.', required=True)
-    parser.add_argument('--maxResults', type=int, default=5, help='Maximum detection results to show.')
-    parser.add_argument('--scoreThreshold', type=float, default=0.5, help='Detection score threshold.')
-    parser.add_argument('--cameraId', type=int, default=0, help='ID of camera.')
-    parser.add_argument('--frameWidth', type=int, default=640, help='Width of frame to capture from camera.')
-    parser.add_argument('--frameHeight', type=int, default=480, help='Height of frame to capture from camera.')
-    args = parser.parse_args()
+if __name__ == "__main__":
+    # Set parameters
+    model_path = "/home/rpi5/Github/DroneCode/tflite-custom-object-bookworm-main/notBest.tflite"
+    max_results = 5
+    score_threshold = 0.5
+    camera_id = 0
+    width, height = 1920, 1080
 
-    run('/home/rpi5/Github/DroneCode/tflite-custom-object-bookworm-main/notBest.tflite', args.maxResults, args.scoreThreshold, args.cameraId, args.frameWidth, args.frameHeight)
+    run(model_path, max_results, score_threshold, camera_id, width, height)
