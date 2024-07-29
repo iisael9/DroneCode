@@ -1,3 +1,48 @@
+"""
+Drone Control and Object Tracking System
+
+Overview:
+This script is designed to control a drone based on object detection using a camera and a TensorFlow Lite model. The drone will track objects, calculate their distance, and adjust its position based on detected angles. Additionally, it monitors the battery level and will return to launch if the battery drops below 50%.
+
+Key Components:
+1. **Camera Setup**:
+   - Initialize the camera with a resolution of 1920x1080.
+   - Capture images for object detection.
+
+2. **Object Detection**:
+   - Load a pre-trained TensorFlow Lite model for detecting objects.
+   - Process each captured image to detect objects and obtain bounding box coordinates, confidence scores, and object sizes.
+
+3. **Distance Calculation**:
+   - Calculate the distance to detected objects based on bounding box area.
+   - Use a linear regression model fitted with known distances to estimate object distance.
+
+4. **Drone Control**:
+   - Adjust the drone's yaw (horizontal angle) and pitch (vertical angle) based on the detected angles to keep the object centered.
+   - Send commands to the drone using the PyMavlink library.
+
+5. **Battery Monitoring**:
+   - Periodically check the drone's battery level.
+   - If the battery level falls below 50%, send a command to return the drone to its launch position.
+
+6. **Logging**:
+   - Optionally log detection data (e.g., object size, distance, confidence) to a CSV file.
+   - User is prompted to enable or disable logging.
+
+How it Works:
+1. The script starts by initializing the camera and setting up the object detection model.
+2. It enters a loop where it continuously captures frames from the camera and performs object detection.
+3. For each detected object, it calculates the distance and adjusts the drone's position to keep the object centered.
+4. It monitors the battery level and returns the drone to launch if necessary.
+5. The detected data is optionally logged to a CSV file for further analysis.
+
+Usage:
+- Ensure the camera and drone are properly set up and connected.
+- Adjust parameters such as model path, max results, score threshold, and camera resolution as needed.
+- Run the script to start object tracking and drone control.
+"""
+
+
 from pymavlink import mavutil
 import argparse
 import time
