@@ -67,11 +67,12 @@ def get_gps_coordinates():
 
     while True:
         # Request GPS messages
-        master.mav.message_factory.global_position_int_send(
-            master.target_system, 0,  # Time since system boot (ignored)
-            int(time.time() * 1e6),  # Time in microseconds
-            0, 0, 0,  # Ignore: latitude, longitude, altitude relative to ground
-            0  # Ignore: relative altitude from terrain
+        master.mav.request_data_stream_send(
+            master.target_system,
+            master.target_component,
+            mavutil.mavlink.MAV_DATA_STREAM_POSITION,
+            1,  # 1 Hz stream rate
+            1   # Start streaming
         )
 
         # Wait for a message with GPS data
@@ -148,7 +149,7 @@ def hover_and_return(current_altitude, hover_duration):
         current_altitude (float): The drone's current altitude in meters.
         hover_duration (float): The duration to hover in seconds.
     """
-    hover_altitude = current_altitude + 1.5  # Set hover altitude 5ft above current
+    hover_altitude = current_altitude + 1.5  # Set hover altitude 1.5 meters above current
 
     # Hover for the specified duration
     print(f"Hovering at {hover_altitude} meters for {hover_duration} seconds...")
@@ -189,4 +190,5 @@ if __name__ == "__main__":
     else:
         arm_and_takeoff(target_altitude)
         current_latitude, current_longitude, current_altitude = get_gps_coordinates()
-        hover_and_return(current_altitude, hover_duration)
+        if current_latitude is not None:
+            hover_and_return(current_altitude, hover_duration)
