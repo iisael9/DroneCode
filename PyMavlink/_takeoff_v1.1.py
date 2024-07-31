@@ -40,8 +40,7 @@ def get_altitude():
 
 
 def check_battery(threshold=20):
-    # Replace with actual battery level check
-    battery_level = 50  # Example value
+    battery_level = 50
     return battery_level > threshold
 
 
