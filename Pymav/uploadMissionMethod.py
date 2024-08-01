@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 
 import math 
 from pymavlink import mavutil
@@ -127,7 +128,7 @@ if __name__ == "__main__":
 
     while(the_connection.target_system == 0):
         print("-- checking Heartbeat...")
-        the_connection.heartbeat()
+        the_connection.wait_heartbeat()
         print("Heartbeat from system (system %u component %u)" % (the_connection.target_system, the_connection.target_component))
 
     mission_waypoints = []
