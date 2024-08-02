@@ -3,6 +3,7 @@ Example of how to Arm and Disarm an Autopilot with pymavlink
 """
 # Import mavutil
 from pymavlink import mavutil
+import time
 
 # Create the connection
 master = mavutil.mavlink_connection("/dev/ttyAMA0", baud=57600)
@@ -25,6 +26,11 @@ master.mav.command_long_send(
 print("Waiting for the vehicle to arm")
 master.motors_armed_wait()
 print('Armed!')
+
+time.sleep(1)
+time.sleep(1)
+time.sleep(1)
+time.sleep(1)
 
 # Disarm
 # master.arducopter_disarm() or:
