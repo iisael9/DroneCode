@@ -13,7 +13,7 @@ target_altitude = 2  # meters above current position
 hold_time = 15  # seconds
 battery_threshold = 50  # percentage
 low_battery_warning_threshold = 60  # percentage
-max_altitude = 10  # maximum safe altitude in meters
+max_altitude = 2  # maximum safe altitude in meters
 deviation_threshold = 0.2  # maximum allowed deviation in meters
 
 
@@ -44,7 +44,7 @@ def check_battery():
     if msg is not None:
         battery_remaining = msg.battery_remaining  # percentage
         return battery_remaining
-    return 100  # assume full battery if no data is received
+    return 100  
 
 
 def return_to_launch():
