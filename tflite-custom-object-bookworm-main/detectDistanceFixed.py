@@ -36,9 +36,12 @@ picam2.start()
 csv_file_path = os.path.join(os.getcwd(), 'detection_data.csv')
 
 # Function to ask the user if they want to log data
+
+
 def ask_to_log():
     response = input("Do you want to log the data? (yes/no): ").strip().lower()
     return response == 'yes'
+
 
 log_data = ask_to_log()
 
@@ -46,14 +49,17 @@ log_data = ask_to_log()
 if log_data:
     csv_file = open(csv_file_path, mode='a', newline='')
     csv_writer = csv.writer(csv_file)
-    csv_writer.writerow(['Date', 'Time', 'Width', 'Height', 'Confidence', 'Horizontal Distance', 'Vertical Distance', 'Distance'])
+    csv_writer.writerow(['Date', 'Time', 'Width', 'Height', 'Confidence',
+                        'Horizontal Distance', 'Vertical Distance', 'Distance'])
 
 # Known distances for initial calibration
-KNOWN_DISTANCES = [2.13, 1.83, 1.52, 1.22, 0.91]  # Distances in meters (7ft, 6ft, 5ft, 4ft, 3ft)
+# Distances in meters (7ft, 6ft, 5ft, 4ft, 3ft)
+KNOWN_DISTANCES = [2.13, 1.83, 1.52, 1.22, 0.91]
 
 # Initialize lists to store areas and corresponding distances
 areas = []
 distances = []
+
 
 def fit_trendline():
     global areas, distances
@@ -65,8 +71,10 @@ def fit_trendline():
     model.fit(areas_np, distances_np)
     return model.coef_[0], model.intercept_
 
+
 def calculate_distance(area, slope, intercept):
     return slope * area + intercept
+
 
 def save_result(result: vision.ObjectDetectorResult, unused_output_image: mp.Image, timestamp_ms: int):
     global FPS, COUNTER, START_TIME, detection_result_list, horizontal_fov_degrees, vertical_fov_degrees, areas, distances
@@ -80,7 +88,8 @@ def save_result(result: vision.ObjectDetectorResult, unused_output_image: mp.Ima
     COUNTER += 1
 
     # Center of the camera screen
-    screen_center_x, screen_center_y = 960, 540  # Assuming the center of the resized frame (1920, 1080)
+    # Assuming the center of the resized frame (1920, 1080)
+    screen_center_x, screen_center_y = 960, 540
 
     # Print out the rectangle size and confidence score for each detected object with timestamp
     for detection in result.detections:
@@ -94,14 +103,16 @@ def save_result(result: vision.ObjectDetectorResult, unused_output_image: mp.Ima
         bbox_center_y = bbox.origin_y + height / 2
 
         # Calculate the distance from the center of the screen to the center of the bounding box
-        horizontal_distance = bbox_center_x - screen_center_x 
+        horizontal_distance = bbox_center_x - screen_center_x
         vertical_distance = screen_center_y - bbox_center_y  # Invert the y-coordinate
 
         # Calculate horizontal theta relative to the camera's FOV
-        horizontal_theta = (horizontal_distance / screen_center_x) * (horizontal_fov_degrees / 2)
+        horizontal_theta = (horizontal_distance /
+                            screen_center_x) * (horizontal_fov_degrees / 2)
 
         # Calculate vertical theta relative to the camera's FOV
-        vertical_theta = (vertical_distance / screen_center_y) * (vertical_fov_degrees / 2)
+        vertical_theta = (vertical_distance / screen_center_y) * \
+            (vertical_fov_degrees / 2)
 
         # Calculate the area of the bounding box
         area = width * height
@@ -113,7 +124,8 @@ def save_result(result: vision.ObjectDetectorResult, unused_output_image: mp.Ima
 
         # Fit the trendline and calculate distance
         slope, intercept = fit_trendline()
-        distance_to_object = calculate_distance(area, slope, intercept) if slope is not None else "N/A"
+        distance_to_object = calculate_distance(
+            area, slope, intercept) if slope is not None else "N/A"
 
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         print(f"[{current_time}] Detected object bounding box - Width: {width} pixels, Height: {height} pixels, Confidence: {score:.2f}, Center: ({bbox_center_x}, {bbox_center_y}), Horizontal Distance: {horizontal_distance} pixels, Vertical Distance: {vertical_distance} pixels, Horizontal Theta: {horizontal_theta:.2f} degrees, Vertical Theta: {vertical_theta:.2f} degrees, Area: {area} pixels^2, Distance: {distance_to_object} meters")
@@ -121,12 +133,14 @@ def save_result(result: vision.ObjectDetectorResult, unused_output_image: mp.Ima
         # Write the data to the CSV file if logging is enabled
         if log_data:
             date, time_with_ms = current_time.split(' ')
-            csv_writer.writerow([date, time_with_ms, width, height, score, horizontal_distance, vertical_distance, distance_to_object])
+            csv_writer.writerow([date, time_with_ms, width, height, score,
+                                horizontal_distance, vertical_distance, distance_to_object])
 
         # Return the bounding box, distance, and angles for displaying on the screen
         return bbox, distance_to_object, horizontal_theta, vertical_theta
 
-def run(model: str, max_results: int, score_threshold: float, 
+
+def run(model: str, max_results: int, score_threshold: float,
         camera_id: int, width: int, height: int) -> None:
     """Continuously run inference on images acquired from the camera.
 
@@ -170,7 +184,8 @@ def run(model: str, max_results: int, score_threshold: float,
 
             # Convert the image from BGR to RGB as required by the TFLite model.
             rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_image)
+            mp_image = mp.Image(
+                image_format=mp.ImageFormat.SRGB, data=rgb_image)
 
             # Run object detection using the model.
             detector.detect_async(mp_image, time.time_ns() // 1_000_000)
@@ -183,10 +198,13 @@ def run(model: str, max_results: int, score_threshold: float,
                         font_size, text_color, font_thickness, cv2.LINE_AA)
 
             # Draw a 4-quadrant grid with the center being zero
-            center_x, center_y = 960, 540  # Assuming the center of the resized frame (1920, 1080)
-            cv2.line(current_frame, (center_x, 0), (center_x, 1080), (255, 255, 255), 1)
-            cv2.line(current_frame, (0, center_y), (1920, center_y), (255, 255, 255), 1)
-            cv2.putText(current_frame, '(0, 0)', (center_x + 5, center_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 
+            # Assuming the center of the resized frame (1920, 1080)
+            center_x, center_y = 960, 540
+            cv2.line(current_frame, (center_x, 0),
+                     (center_x, 1080), (255, 255, 255), 1)
+            cv2.line(current_frame, (0, center_y),
+                     (1920, center_y), (255, 255, 255), 1)
+            cv2.putText(current_frame, '(0, 0)', (center_x + 5, center_y - 5), cv2.FONT_HERSHEY_SIMPLEX,
                         0.5, (255, 255, 255), 1, cv2.LINE_AA)
 
             bbox, distance, horizontal_theta, vertical_theta = None, None, None, None
@@ -204,24 +222,28 @@ def run(model: str, max_results: int, score_threshold: float,
                     adjusted_bbox_center_y = center_y - bbox_center_y  # Invert the y-coordinate
 
                     # Calculate horizontal theta relative to the camera's FOV
-                    horizontal_theta = (adjusted_bbox_center_x / center_x) * (horizontal_fov_degrees / 2)
+                    horizontal_theta = (
+                        adjusted_bbox_center_x / center_x) * (horizontal_fov_degrees / 2)
 
                     # Calculate vertical theta relative to the camera's FOV
-                    vertical_theta = (adjusted_bbox_center_y / center_y) * (vertical_fov_degrees / 2)
+                    vertical_theta = (adjusted_bbox_center_y /
+                                      center_y) * (vertical_fov_degrees / 2)
 
                     # Show the coordinates of the center of the bounding box and angles
-                    cv2.putText(current_frame, f'({adjusted_bbox_center_x}, {adjusted_bbox_center_y})', 
-                                (int(bbox_center_x), int(bbox_center_y)), cv2.FONT_HERSHEY_SIMPLEX, 
+                    cv2.putText(current_frame, f'({adjusted_bbox_center_x}, {adjusted_bbox_center_y})',
+                                (int(bbox_center_x), int(bbox_center_y)
+                                 ), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.5, (0, 255, 0), 1, cv2.LINE_AA)
-                    cv2.putText(current_frame, f'Horiz. Theta: {horizontal_theta:.2f}', (center_x + 5, center_y + 15), cv2.FONT_HERSHEY_SIMPLEX, 
+                    cv2.putText(current_frame, f'Horiz. Theta: {horizontal_theta:.2f}', (center_x + 5, center_y + 15), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-                    cv2.putText(current_frame, f'Vert. Theta: {vertical_theta:.2f}', (center_x + 5, center_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 
+                    cv2.putText(current_frame, f'Vert. Theta: {vertical_theta:.2f}', (center_x + 5, center_y + 30), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.5, (255, 255, 255), 1, cv2.LINE_AA)
 
                     # Get the distance to the object
                     area = width * height
                     slope, intercept = fit_trendline()
-                    distance = calculate_distance(area, slope, intercept) if slope is not None else "N/A"
+                    distance = calculate_distance(
+                        area, slope, intercept) if slope is not None else "N/A"
 
                 detection_frame = current_frame
                 detection_result_list.clear()
@@ -230,26 +252,29 @@ def run(model: str, max_results: int, score_threshold: float,
                 # Create a sidebar to display distance, horizontal theta, and vertical theta
                 sidebar_width = 200
                 sidebar = np.zeros((1080, sidebar_width, 3), dtype=np.uint8)
-                cv2.rectangle(sidebar, (0, 0), (sidebar_width, 1080), (0, 0, 0), -1)
+                cv2.rectangle(sidebar, (0, 0),
+                              (sidebar_width, 1080), (0, 0, 0), -1)
 
                 # Display the distance, horizontal theta, and vertical theta in the sidebar
                 if bbox is not None and distance is not None and horizontal_theta is not None and vertical_theta is not None:
                     info_text = [
-                        f'Distance: {distance:.2f}m' if isinstance(distance, float) else f'Distance: {distance}',
+                        f'Distance: {distance:.2f}m' if isinstance(
+                            distance, float) else f'Distance: {distance}',
                         f'Horiz. Theta: {horizontal_theta:.2f}°',
                         f'Vert. Theta: {vertical_theta:.2f}°'
                     ]
                     for i, text in enumerate(info_text):
-                        cv2.putText(sidebar, text, (10, 30 + i * 30), cv2.FONT_HERSHEY_SIMPLEX, 
+                        cv2.putText(sidebar, text, (10, 30 + i * 30), cv2.FONT_HERSHEY_SIMPLEX,
                                     0.7, (255, 255, 255), 2, cv2.LINE_AA)  # White text
 
                     # Draw bounding box in magenta purple
-                    cv2.rectangle(detection_frame, (int(bbox.origin_x), int(bbox.origin_y)), 
-                                  (int(bbox.origin_x + bbox.width), int(bbox.origin_y + bbox.height)), 
+                    cv2.rectangle(detection_frame, (int(bbox.origin_x), int(bbox.origin_y)),
+                                  (int(bbox.origin_x + bbox.width),
+                                   int(bbox.origin_y + bbox.height)),
                                   (255, 0, 255), 2)
 
                     # Draw line from the camera (center of the screen) to the center of the bounding box in orange
-                    cv2.line(detection_frame, (center_x, center_y), (int(bbox_center_x), int(bbox_center_y)), 
+                    cv2.line(detection_frame, (center_x, center_y), (int(bbox_center_x), int(bbox_center_y)),
                              (0, 165, 255), 2)
 
                 # Combine the sidebar with the detection frame
@@ -267,6 +292,7 @@ def run(model: str, max_results: int, score_threshold: float,
         detector.close()
         cv2.destroyAllWindows()
 
+
 def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -283,7 +309,7 @@ def main():
     parser.add_argument(
         '--scoreThreshold',
         help='The score threshold of detection results.',
-        required=False, type=float, default=0.25)
+        required=False, type=float, default=0.50)
     parser.add_argument(
         '--cameraId', help='Id of camera.', required=False, type=int, default=0)
     parser.add_argument(
@@ -298,6 +324,7 @@ def main():
 
     run(args.model, int(args.maxResults),
         args.scoreThreshold, int(args.cameraId), args.frameWidth, args.frameHeight)
+
 
 if __name__ == '__main__':
     main()
