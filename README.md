@@ -1,4 +1,4 @@
-Presenation Link: https://docs.google.com/presentation/d/1dRVsFxHRzLkf_clWrUz6FTEvvhVpUxZN6USSj1qnYqE/edit?usp=sharing
+Presenation Pdf: ^
 
 Poster Link: https://docs.google.com/presentation/d/1UntFdeLDF-n2QV81LJqhUGJeaOP6bONV/edit?usp=sharing&ouid=114271457125882355547&rtpof=true&sd=true
 Autonomous Drone Shadowing with AI
